@@ -9,9 +9,8 @@ vertexShaderCode = """
     attribute vec3 position;
     attribute vec4 color;
     varying vec4 vColor;
-    uniform mat4 tMatrix;
     void main(){
-        gl_Position = tMatrix * vec4(position, 1.0);
+        gl_Position = vec4(position, 1.0);
         vColor = color;
     }
     """
@@ -60,8 +59,6 @@ def createProgram(vertex, fragment):
 
 
 # -- Building Data -- 
-
-
 data = np.zeros(12, [("position", np.float32, 3),
                     ("color",    np.float32, 4)])
 data['position'] = [[-0.30, +0.45, +1.00],
@@ -77,23 +74,10 @@ data['position'] = [[-0.30, +0.45, +1.00],
                     [-0.27, -0.42, +1.00],
                     [+0.35, -0.42, +1.00]]
 
-data['color'] =((0, 0.00, 0.60, 1),
-                (0, 0.00, 0.60, 1),
-                (0, 0.00, 0.60, 1),
-                (0, 0.00, 0.60, 1),
-                (0, 0.00, 0.60, 1),
-                (0, 0.00, 0.60, 1),
-                (0.9, 0.0, 0.2, 1),
-                (0.9, 0.0, 0.2, 1),
-                (0.9, 0.0, 0.2, 1),
-                (0.9, 0.0, 0.2, 1),
-                (0.9, 0.0, 0.2, 1),
-                (0.9, 0.0, 0.2, 1))
-
-tMatrix = np.array([1.0,0.0,0.0,0.0,
-                    0.0,1.0,0.0,0.0,
-                    0.0,0.0,1.0,0.0,
-                    0.2,0.3,0.0,1.0], np.float32)
+data['color'] =((0, 0.00, 0.60, 1), (0, 0.00, 0.60, 1), (0, 0.00, 0.60, 1),
+                (0, 0.00, 0.60, 1), (0, 0.00, 0.60, 1), (0, 0.00, 0.60, 1),
+                (0.9, 0.0, 0.2, 1), (0.9, 0.0, 0.2, 1), (0.9, 0.0, 0.2, 1),
+                (0.9, 0.0, 0.2, 1), (0.9, 0.0, 0.2, 1), (0.9, 0.0, 0.2, 1))
 
 indicesData = np.array([0,1,2,3,4,5,6,7,8,9,10,11], dtype=np.int32)
 
@@ -135,12 +119,8 @@ def initialize():
     gl.glBindBuffer(gl.GL_ARRAY_BUFFER, buffer)
     gl.glVertexAttribPointer(loc, 4, gl.GL_FLOAT, False, stride, offset)
 
-    loc = gl.glGetUniformLocation(program, "tMatrix")
-    gl.glUniformMatrix4fv(loc, 1, gl.GL_FALSE, tMatrix)
-
     # Upload data
     gl.glBufferData(gl.GL_ARRAY_BUFFER, data.nbytes, data, gl.GL_DYNAMIC_DRAW)
-
     gl.glBufferData(gl.GL_ELEMENT_ARRAY_BUFFER, indicesData.nbytes, indicesData, gl.GL_STATIC_DRAW)
 
 
