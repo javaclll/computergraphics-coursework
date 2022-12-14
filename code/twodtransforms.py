@@ -10,16 +10,10 @@ vertexShaderCode = """
     attribute vec3 position;
     uniform mat4 transformMatrix;  
     uniform mat4 translate;
-
-    mat4 retranslate;  
+    uniform mat4 retranslate; 
 
     void main(){
-
-        retranslate = translate;
-        retranslate[0][3] *= -1.0;
-        retranslate[1][3] *= -1.0;
-
-        gl_Position = retranslate * transformMatrix * translate * vec4(position, 1.0);
+        gl_Position = transformMatrix * translate * vec4(position, 1.0);
     }
     """
 
@@ -29,6 +23,91 @@ fragmentShaderCode = """
         gl_FragColor = vColor;
     }
     """
+# -- Building Data -- 
+def buildData():
+
+    if len(sys.argv) >= 3:
+        resolution = [int(sys.argv[1]), int(sys.argv[2])]
+    else:
+        resolution = [500,500]
+
+    data = [[-25, 25, 0],
+            [100, 25, 0],
+            [-25, 100, 0]]
+    
+    return data, resolution
+
+# normalization function
+def tonormalized(coordinates, resolution):
+    for coordinate in (coordinates):
+        coordinate[0] = coordinate[0] * 2 / (resolution[0])
+        coordinate[1] = coordinate[1] * 2 / (resolution[1])
+
+    return np.array(coordinates, dtype = np.float32)
+
+# helper function to generate our required transformation matrix
+def transformationFunction(transformationType, transformationData):
+
+    transformationMatrix =  np.identity(4, dtype = np.float32)
+
+    if transformationType == "translation":
+        transformationMatrix = np.array([   1.0,0.0,0.0, transformationData[0],
+                                            0.0,1.0,0.0, transformationData[1],
+                                            0.0,0.0,0.0,0.0,
+                                            0.0,0.0,0.0,1.0], np.float32)
+
+    elif transformationType == "rotation":
+        cTheta = np.cos(transformationData[0]/180 * math.pi)
+        sTheta = np.sin(transformationData[0]/180 * math.pi)
+
+        transformationMatrix = np.array([   cTheta, -sTheta ,0.0,0.0,
+                                            sTheta, cTheta,0.0,0.0,
+                                            0.0,0.0,0.0,0.0,
+                                            0.0,0.0,0.0,1.0], np.float32)
+    
+    elif transformationType == "scaling":
+
+        transformationMatrix = np.array([   transformationData[0],0.0,0.0,0.0,
+                                            0.0,transformationData[1],0.0,0.0,
+                                            0.0,0.0,0.0,0.0,
+                                            0.0,0.0,0.0,1.0], np.float32)
+
+    elif transformationType == "reflection":
+        
+        if transformationData[0] == "y":
+            transformationMatrix = np.array([   -1.0,0.0,0.0,0.0,
+                                                0.0,1.0,0.0,0.0,
+                                                0.0,0.0,0.0,0.0,
+                                                0.0,0.0,0.0,1.0], np.float32)
+        elif transformationData[0] == "x":
+            transformationMatrix = np.array([   1.0,0.0,0.0,0.0,
+                                                0.0,-1.0,0.0,0.0,
+                                                0.0,0.0,0.0,0.0,
+                                                0.0,0.0,0.0,1.0], np.float32)
+        elif transformationData[0] == "xy":
+            transformationMatrix = np.array([   0.0,1.0,0.0,0.0,
+                                                1.0,0.0,0.0,0.0,
+                                                0.0,0.0,0.0,0.0,
+                                                0.0,0.0,0.0,1.0], np.float32)
+        else:
+            transformationMatrix = np.array([   -1.0,0.0,0.0,0.0,
+                                                0.0,-1.0,0.0,0.0,
+                                                0.0,0.0,0.0,0.0,
+                                                0.0,0.0,0.0,1.0], np.float32)
+    elif transformationType == "shearing":
+        if transformationData[0] == "y":
+            transformationMatrix = np.array([   1.0,0.0,0.0,0.0,
+                                                transformationData[1],1.0,0.0,0.0,
+                                                0.0,0.0,0.0,0.0,
+                                                0.0,0.0,0.0,1.0], np.float32)
+        else:
+            transformationMatrix = np.array([   1.0,transformationData[1],0.0,0.0,
+                                                0.0,1.0,0.0,0.0,
+                                                0.0,0.0,0.0,0.0,
+                                                0.0,0.0,0.0,1.0], np.float32)
+
+    return transformationMatrix
+
 
 # function to request and compiler shader slots from GPU
 def createShader(source, type):
@@ -64,92 +143,6 @@ def createProgram(vertex, fragment):
     gl.glDetachShader(program, fragment)
 
     return program
-
-
-# -- Building Data -- 
-def buildData():
-
-    if len(sys.argv) >= 3:
-        resolution = [int(sys.argv[1]), int(sys.argv[2])]
-    else:
-        resolution = [300,300]
-
-    data = [[-50, 25, 1],
-            [50, 25 , 1],
-            [0, 100, 1]]
-    
-    return data, resolution
-
-def tonormalized(coordinates, resolution):
-    for coordinate in (coordinates):
-        coordinate[0] = coordinate[0] * 2 / (resolution[0])
-        coordinate[1] = coordinate[1] * 2 / (resolution[1])
-
-    return np.array(coordinates, dtype = np.float32)
-
-
-def transformationFunction(transformationType, transformationData):
-
-    transformationMatrix =  np.identity(4, dtype = np.float32)
-
-    if transformationType == "translation":
-        transformationMatrix = np.array([   1.0,0.0,0.0, transformationData[0],
-                                            0.0,1.0,0.0, transformationData[1],
-                                            0.0,0.0,1.0,0.0,
-                                            0.0,0.0,0.0,1.0], np.float32)
-
-    elif transformationType == "rotation":
-        cTheta = np.cos(transformationData[0]/180 * math.pi)
-        sTheta = np.sin(transformationData[0]/180 * math.pi)
-
-        transformationMatrix = np.array([   cTheta, -sTheta ,0.0,0.0,
-                                            sTheta, cTheta,0.0,0.0,
-                                            0.0,0.0,1.0,0.0,
-                                            0.0,0.0,0.0,1.0], np.float32)
-    
-    elif transformationType == "scaling":
-
-        transformationMatrix = np.array([   transformationData[0],0.0,0.0,0.0,
-                                            0.0,transformationData[1],0.0,0.0,
-                                            0.0,0.0,1.0,0.0,
-                                            0.0,0.0,0.0,1.0], np.float32)
-
-    elif transformationType == "reflection":
-        
-        if transformationData[0] == "y":
-            transformationMatrix = np.array([   -1.0,0.0,0.0,0.0,
-                                                0.0,1.0,0.0,0.0,
-                                                0.0,0.0,1.0,0.0,
-                                                0.0,0.0,0.0,1.0], np.float32)
-        elif transformationData[0] == "x":
-            transformationMatrix = np.array([   1.0,0.0,0.0,0.0,
-                                                0.0,-1.0,0.0,0.0,
-                                                0.0,0.0,1.0,0.0,
-                                                0.0,0.0,0.0,1.0], np.float32)
-        elif transformationData[0] == "xy":
-            transformationMatrix = np.array([   1.0,1.0,0.0,0.0,
-                                                1.0,0.0,0.0,0.0,
-                                                0.0,0.0,1.0,0.0,
-                                                0.0,0.0,0.0,1.0], np.float32)
-        else:
-            transformationMatrix = np.array([   -1.0,0.0,0.0,0.0,
-                                                0.0,-1.0,0.0,0.0,
-                                                0.0,0.0,1.0,0.0,
-                                                0.0,0.0,0.0,1.0], np.float32)
-    elif transformationType == "shearing":
-        if transformationData[0] == "y":
-            transformationMatrix = np.array([   1.0,0.0,0.0,0.0,
-                                                transformationData[1],1.0,-transformationData[1] * transformationData[2],0.0,
-                                                0.0,0.0,1.0,0.0,
-                                                0.0,0.0,0.0,1.0], np.float32)
-        else:
-            transformationMatrix = np.array([   1.0,transformationData[1],-transformationData[1] * transformationData[2],0.0,
-                                                0.0,1.0,0.0,0.0,
-                                                0.0,0.0,1.0,0.0,
-                                                0.0,0.0,0.0,1.0], np.float32)
-
-    return transformationMatrix
-
 
 # initialization function
 def initialize(transformationMatrix = np.identity(4, np.float32), translationMatrix = np.identity(4, np.float32)):
@@ -190,7 +183,6 @@ def initialize(transformationMatrix = np.identity(4, np.float32), translationMat
     loc = gl.glGetUniformLocation(program, "translate")
     gl.glUniformMatrix4fv(loc, 1, gl.GL_TRUE, translationMatrix)
 
-
     # Upload data
     gl.glBufferData(gl.GL_ARRAY_BUFFER, data.nbytes, data, gl.GL_DYNAMIC_DRAW)
 
@@ -219,7 +211,16 @@ glut.glutReshapeFunc(reshape)
 data, resolution = buildData()
 data = tonormalized(data, resolution)
 
-initialize()
+# Calculate the Transformation Matrix Here as follows :
+transformationMatrix = transformationFunction("shearing", ["x", 2])
+# translationMatrix = np.array([   1.0,0.0,0.0, -data[0][0],
+#                                 0.0,1.0,0.0, -data[0][1],
+#                                 0.0,0.0,1.0,0.0,
+#                                 0.0,0.0,0.0,1.0], np.float32)
+
+# Pass the Transformation Matrix and Translation Matrix 
+# as Parameters to initialize if need be 
+initialize(transformationMatrix = transformationMatrix)
 
 glut.glutDisplayFunc(display)
 glut.glutPostRedisplay()
@@ -229,8 +230,3 @@ glut.glutKeyboardFunc(keyboard)
 glut.glutMainLoop()
 
 
-# transformationMatrix = transformationFunction("rotation", [30])
-# translationMatrix = np.array([   1.0,0.0,0.0, -data[0][0],
-#                                 0.0,1.0,0.0, -data[0][1],
-#                                 0.0,0.0,1.0,0.0,
-#                                 0.0,0.0,0.0,1.0], np.float32)

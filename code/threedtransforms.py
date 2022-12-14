@@ -6,16 +6,17 @@ import math
 
 import OpenGL.GL as gl
 import OpenGL.GLUT as glut
+import OpenGL.GLU as glu
 
 vertexShaderCode = """
     attribute vec3 position;
     attribute vec4 color;
-    varying vec4 vColor;
-
-    uniform mat4 rotationMatrix;
+    varying vec4 vColor; 
+    uniform mat4 rotationMatrix[2];
+    uniform mat4 transformationMatrix;
 
     void main(){
-        gl_Position = rotationMatrix * vec4(position, 1.0);
+        gl_Position = transformationMatrix * rotationMatrix[1] * rotationMatrix[0] * vec4(position, 1.0);
         vColor = color;
     }
     """
@@ -26,6 +27,90 @@ fragmentShaderCode = """
         gl_FragColor = vColor;
     }
     """
+
+# -- Building Data -- 
+def generateCubeData():
+    data = np.zeros(8, [("position", np.float32, 3),
+                    ("color",    np.float32, 4)])
+        
+    data["position"] = (
+        (-0.5, 0.5, 0.5),
+        (0.5, 0.5, 0.5),
+        (-0.5, -0.5, 0.5),
+        (0.5, -0.5, 0.5),
+        (-0.5, 0.5, -0.5),
+        (0.5, 0.5, -0.5),
+        (-0.5, -0.5, -0.5),
+        (0.5, -0.5, -0.5),
+    )
+
+    data['color'] = (
+                (0.114, 0.505, 0.345, 1.0),
+                (0.483, 0.290, 0.734, 1.0),
+                (0.097, 0.513, 0.064, 1.0),
+                (0.245, 0.719, 0.592, 1.0),
+                (0.583, 0.771, 0.014, 1.0),
+                (0.473, 0.211, 0.457, 1.0),
+                (0.322, 0.245, 0.574, 1.0),
+                (0.083, 0.071, 0.014, 1.0),
+                )
+
+    indicesData = np.array([0, 1, 2, 1, 2, 3,
+                            4, 5, 6, 5, 6, 7, 
+                            4, 2, 5, 2, 5, 1, 
+                            5, 1, 3, 5, 3, 7, 
+                            0, 4, 2, 4, 2, 6, 
+                            2, 6, 3, 6, 3, 7], np.int32)
+
+    return data, indicesData
+
+def generateTransforms(transformationType = None, transformationData = None):
+    
+    transformationMatrix = np.identity(4, dtype = np.float32)
+    transformationMatrix = transformationMatrix.flatten()
+
+    if not transformationType:
+        return transformationMatrix
+    
+    if transformationType == "translation":
+        transformationMatrix = np.array([  1.0,0.0,0.0,transformationData[0],
+                                            0.0,1.0,0.0,transformationData[1],
+                                            0.0,0.0,1.0,transformationData[2],
+                                            0.0,0.0,0.0,1.0], np.float32)
+
+    elif transformationType == "rotation":
+
+        cTheta = np.cos(transformationData[1]/180 * math.pi)
+        sTheta = np.sin(transformationData[1]/180 * math.pi)
+
+        # x - axis rotation 
+        if transformationData[0] == "pitch":
+            transformationMatrix = np.array([1.0,0.0,0.0,0.0,
+                                            0.0,cTheta,-sTheta,0.0,
+                                            0.0,sTheta,cTheta,0.0,
+                                            0.0,0.0,0.0,1.0], np.float32)
+        
+        # y - axis rotation
+        elif transformationData[0] == "yaw":
+            transformationMatrix = np.array([cTheta,0.0,sTheta,0.0,
+                                            0.0,1.0,0.0,0.0,
+                                            -sTheta,0.0,cTheta,0.0,
+                                            0.0,0.0,0.0,1.0], np.float32)
+        
+        # z - axis rotation
+        elif transformationData[0] == "roll":
+            transformationMatrix = np.array([cTheta,-sTheta,0.0,0.0,
+                                            sTheta,cTheta,0.0,0.0,
+                                            0.0,0.0,1.0,0.0,
+                                            0.0,0.0,0.0,1.0], np.float32)
+
+    elif transformationType == "scaling":
+        transformationMatrix = np.array([transformationData[0],0.0,0.0,0.0,
+                                        0.0,transformationData[1],0.0,0.0,
+                                        0.0,0.0,transformationData[2],0.0,
+                                        0.0,0.0,0.0,1.0], np.float32)
+        
+    return transformationMatrix
 
 # function to request and compiler shader slots from GPU
 def createShader(source, type):
@@ -62,63 +147,8 @@ def createProgram(vertex, fragment):
 
     return program
 
-
-# -- Building Data -- 
-data = np.zeros(8, [("position", np.float32, 3),
-                    ("color",    np.float32, 4)])
-
-data['position'] = (
-                    (-0.0915,0.183,0.841478),
-                    (0.7745,0.183,0.341478), 
-                    (-0.3415,-0.683,0.408478), 
-                    (0.5245,-0.683,-0.091522), 
-                    ( -0.5245,0.683,0.091522),
-                    (0.3415,0.683,-0.408478), 
-                    (-0.7745,-0.183,-0.341478), 
-                    (0.0915,-0.183,-0.841478), 
-                    )
-
-# rot X 30
-# -0.5	0.5	    -0.5	0.5	    -0.5	0.5	    -0.5	0.5
-# 0.183	0.183	-0.683	-0.683	0.683	0.683	-0.183	-0.183
-# 0.683	0.683	0.183	0.183	-0.183	-0.183	-0.683	-0.683
-# 1	    1	    1	    1	    1	    1	    1	    1
-
-
-#rot Y 30
-# -0.0915	0.7745	    -0.3415	    0.5245	    -0.5245	    0.3415	    -0.7745	    0.0915
-# 0.183	    0.183	    -0.683	    -0.683	    0.683	    0.683	    -0.183	    -0.183
-# 0.841478	0.341478	0.408478	-0.091522	0.091522	-0.408478	-0.341478	-0.841478
-# 1	1	1	1	1	1	1	1
-
-
-# (0, 4, 2, 4, 2, 6) : left face
-# (2, 6, 3, 6, 3, 7) : bottom face
-# (4, 5, 6, 5, 6, 7) : front face
-# (0, 1, 2, 1, 2, 3) : back face 
-# (4, 2, 5, 2, 5, 1) : top face 
-# (5, 1, 3, 5, 3, 7) : right face 
-
-data['color'] = (
-                (0.543, 0.021, 0.978, 1.0),
-                (0.673, 0.211, 0.457, 1.0),
-                (0.302, 0.455, 0.848, 1.0),
-                (0.225, 0.587, 0.040, 1.0),
-                (0.714, 0.505, 0.345, 1.0),
-                (0.783, 0.290, 0.734, 1.0),
-                (0.997, 0.513, 0.064, 1.0),
-                (0.945, 0.719, 0.592, 1.0),
-                )
-
-indicesData = np.array([0, 1, 2, 1, 2, 3,
-                        4, 5, 6, 5, 6, 7, 
-                        4, 2, 5, 2, 5, 1, 
-                        5, 1, 3, 5, 3, 7, 
-                        0, 4, 2, 4, 2, 6, 
-                        2, 6, 3, 6, 3, 7], np.int32)
-
 # initialization function
-def initialize():
+def initialize(transformationMatrix):
     global program
     global data
 
@@ -132,15 +162,21 @@ def initialize():
         createShader(fragmentShaderCode, gl.GL_FRAGMENT_SHADER),
     )
 
-    theta = 30
-    cTheta = np.cos(theta/180 * math.pi)
-    sTheta = np.sin(theta/180 * math.pi)
-
-    rotationMatrix = np.array([ cTheta,0.0,sTheta,0.0,
+    degrees = 40
+    cTheta = np.cos(degrees/180 * math.pi)
+    sTheta = np.sin(degrees/180 * math.pi)
+    
+    initialRotation = np.array([1.0,0.0,0.0,0.0,
+                                0.0,cTheta,-sTheta,0.0,
+                                0.0,sTheta,cTheta,0.0,
+                                0.0,0.0,0.0,1.0], np.float32)
+        
+    secondRotation = np.array([cTheta,0.0,sTheta,0.0,
                                 0.0,1.0,0.0,0.0,
                                 -sTheta,0.0,cTheta,0.0,
                                 0.0,0.0,0.0,1.0], np.float32)
-
+    
+    rotation = np.array([initialRotation, secondRotation])
     # make program the default program
     gl.glUseProgram(program)
 
@@ -166,7 +202,10 @@ def initialize():
     gl.glVertexAttribPointer(loc, 4, gl.GL_FLOAT, False, stride, offset)
 
     loc = gl.glGetUniformLocation(program, "rotationMatrix")
-    gl.glUniformMatrix4fv(loc, 1, gl.GL_TRUE, rotationMatrix)
+    gl.glUniformMatrix4fv(loc, 2, gl.GL_TRUE, rotation)
+
+    loc = gl.glGetUniformLocation(program, "transformationMatrix")
+    gl.glUniformMatrix4fv(loc, 1, gl.GL_TRUE, transformationMatrix)
     
     # Upload data
     gl.glBufferData(gl.GL_ARRAY_BUFFER, data.nbytes, data, gl.GL_DYNAMIC_DRAW)
@@ -184,7 +223,6 @@ def display():
 def reshape(width,height):
     gl.glViewport(0, 0, width, height)
 
-
 def keyboard( key, x, y):
     if key == b'\x1b':
         os._exit(1)
@@ -196,7 +234,12 @@ glut.glutCreateWindow('Graphics Window')
 glut.glutReshapeWindow(800,800)
 glut.glutReshapeFunc(reshape)
 
-initialize()
+data, indicesData = generateCubeData()
+
+# generate transformation matrix through paramter provision
+transformationMatrix = generateTransforms("scaling", [0.8, 0.6, 0.6])
+
+initialize(transformationMatrix = transformationMatrix)
 
 glut.glutDisplayFunc(display)
 glut.glutPostRedisplay()
@@ -204,3 +247,39 @@ glut.glutKeyboardFunc(keyboard)
 
 # enter the mainloop
 glut.glutMainLoop()
+
+
+
+
+# rot X 30
+# -0.5	0.5	    -0.5	0.5	    -0.5	0.5	    -0.5	0.5
+# 0.183	0.183	-0.683	-0.683	0.683	0.683	-0.183	-0.183
+# 0.683	0.683	0.183	0.183	-0.183	-0.183	-0.683	-0.683
+# 1	    1	    1	    1	    1	    1	    1	    1
+
+
+#rot Y 30
+# -0.0915	0.7745	    -0.3415	    0.5245	    -0.5245	    0.3415	    -0.7745	    0.0915
+# 0.183	    0.183	    -0.683	    -0.683	    0.683	    0.683	    -0.183	    -0.183
+# 0.841478	0.341478	0.408478	-0.091522	0.091522	-0.408478	-0.341478	-0.841478
+# 1	1	1	1	1	1	1	1
+
+
+# (0, 4, 2, 4, 2, 6) : left face
+# (2, 6, 3, 6, 3, 7) : bottom face
+# (4, 5, 6, 5, 6, 7) : front face
+# (0, 1, 2, 1, 2, 3) : back face 
+# (4, 2, 5, 2, 5, 1) : top face 
+# (5, 1, 3, 5, 3, 7) : right face 
+
+
+ # data['position'] = (
+    #     (-0.04575,   0.0915,    0.420739),
+    #     ( 0.38725 ,  0.0915 ,   0.170739),
+    #     (-0.17075 , -0.3415,    0.204239),
+    #     ( 0.26225,  -0.3415,   -0.045761),
+    #     (-0.26225 ,  0.3415,    0.045761),
+    #     ( 0.17075,   0.3415,   -0.204239),
+    #     (-0.38725 , -0.0915 ,  -0.170739),
+    #     ( 0.04575 , -0.0915,   -0.420739)
+    #     )
