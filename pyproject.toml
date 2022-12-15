@@ -11,6 +11,7 @@ PyOpenGL = "^3.1.6"
 moderngl = "^5.7.3"
 
 [tool.poetry.dev-dependencies]
+black = "^22.12.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
